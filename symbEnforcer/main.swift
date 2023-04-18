@@ -60,8 +60,7 @@ class FileMonitor {
 }
 
 
-let configFilePath = "/Users/flag/.config/symbEnforcer/config.json"
-
+let configFilePath = "\(NSHomeDirectory())/.config/symbEnforcer/config.json"
 var targetApplications:[String] = []
 
 // 定义一个函数，用于读取配置文件
