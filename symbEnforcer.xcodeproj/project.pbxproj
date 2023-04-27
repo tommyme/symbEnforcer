@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		672933E229F919D300898A37 /* fileMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 672933E129F919D300898A37 /* fileMonitor.swift */; };
+		672933E429F91A8500898A37 /* keyboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 672933E329F91A8500898A37 /* keyboard.swift */; };
+		672933E629F91C2000898A37 /* context.swift in Sources */ = {isa = PBXBuildFile; fileRef = 672933E529F91C2000898A37 /* context.swift */; };
+		672933EE29F9796600898A37 /* Space.swift in Sources */ = {isa = PBXBuildFile; fileRef = 672933ED29F9796600898A37 /* Space.swift */; };
 		67C98CCE29EE75160020A2D1 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67C98CCD29EE75160020A2D1 /* main.swift */; };
 /* End PBXBuildFile section */
 
@@ -23,6 +27,11 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		672933E129F919D300898A37 /* fileMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = fileMonitor.swift; sourceTree = "<group>"; };
+		672933E329F91A8500898A37 /* keyboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = keyboard.swift; sourceTree = "<group>"; };
+		672933E529F91C2000898A37 /* context.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = context.swift; sourceTree = "<group>"; };
+		672933EC29F975A100898A37 /* symbEnforcer-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "symbEnforcer-Bridging-Header.h"; sourceTree = "<group>"; };
+		672933ED29F9796600898A37 /* Space.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Space.swift; sourceTree = "<group>"; };
 		67C98CCA29EE75160020A2D1 /* symbEnforcer */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = symbEnforcer; sourceTree = BUILT_PRODUCTS_DIR; };
 		67C98CCD29EE75160020A2D1 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -38,6 +47,17 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		672933DF29F919A900898A37 /* share */ = {
+			isa = PBXGroup;
+			children = (
+				672933E129F919D300898A37 /* fileMonitor.swift */,
+				672933E329F91A8500898A37 /* keyboard.swift */,
+				672933E529F91C2000898A37 /* context.swift */,
+				672933ED29F9796600898A37 /* Space.swift */,
+			);
+			path = share;
+			sourceTree = "<group>";
+		};
 		67C98CC129EE75160020A2D1 = {
 			isa = PBXGroup;
 			children = (
@@ -57,7 +77,9 @@
 		67C98CCC29EE75160020A2D1 /* symbEnforcer */ = {
 			isa = PBXGroup;
 			children = (
+				672933DF29F919A900898A37 /* share */,
 				67C98CCD29EE75160020A2D1 /* main.swift */,
+				672933EC29F975A100898A37 /* symbEnforcer-Bridging-Header.h */,
 			);
 			path = symbEnforcer;
 			sourceTree = "<group>";
@@ -94,6 +116,7 @@
 				TargetAttributes = {
 					67C98CC929EE75160020A2D1 = {
 						CreatedOnToolsVersion = 14.1;
+						LastSwiftMigration = 1410;
 					};
 				};
 			};
@@ -120,7 +143,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				672933EE29F9796600898A37 /* Space.swift in Sources */,
+				672933E429F91A8500898A37 /* keyboard.swift in Sources */,
+				672933E629F91C2000898A37 /* context.swift in Sources */,
 				67C98CCE29EE75160020A2D1 /* main.swift in Sources */,
+				672933E229F919D300898A37 /* fileMonitor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -243,10 +270,18 @@
 		67C98CD229EE75160020A2D1 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 3A2QQFRB43;
 				ENABLE_HARDENED_RUNTIME = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OBJC_BRIDGING_HEADER = "symbEnforcer/symbEnforcer-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
@@ -254,10 +289,17 @@
 		67C98CD329EE75160020A2D1 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 3A2QQFRB43;
 				ENABLE_HARDENED_RUNTIME = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OBJC_BRIDGING_HEADER = "symbEnforcer/symbEnforcer-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
