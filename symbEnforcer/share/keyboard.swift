@@ -65,24 +65,6 @@ func checkFlags(flags: CGEventFlags) -> String {
 }
 
 
-func doSymbEnforcer() -> Bool {
-    let appName = workspace.frontmostApplication?.localizedName
-    return targetApplications.contains(appName!)
-}
-
-
-func doBanner() -> Bool {
-    let apps: [String] = ["Microsoft Remote Desktop Beta"]
-    return apps.contains(frontAppName) && prevIsFullScreen!
-}
-    
-func doFunctional() -> Bool {
-    return true
-}
-
-func doHook() -> Bool {
-    return true
-}
 func getFrontMostAppName() -> String {
     return frontAppName
 }
@@ -144,6 +126,22 @@ class EventInfo {
               "\t\(checkFlags(flags: flags))")
     }
 
+    func doSymbEnforcer() -> Bool {
+        return targetApplications.contains(frontAppName)
+    }
+
+    func doBanner() -> Bool {
+        let apps: [String] = ["Microsoft Remote Desktop Beta"]
+        return apps.contains(frontAppName) && nowIsFullScreen
+    }
+        
+    func doFunctional() -> Bool {
+        return true
+    }
+
+    func doHook() -> Bool {
+        return true
+    }
 }
 
 // 创建一个键盘事件监听器
@@ -158,7 +156,7 @@ let eventTap = CGEvent.tapCreate(
 
         info.log()
         
-        if doHook() {
+        if info.doHook() {
             if info.nowIsFullScreen != prevIsFullScreen {
                 // update value
                 prevIsFullScreen = info.nowIsFullScreen
@@ -172,7 +170,7 @@ let eventTap = CGEvent.tapCreate(
         }
 
         // functional layer  截图键 和command shift z冲突
-        if doFunctional() {
+        if info.doFunctional() {
             // 把鸡肋的截图键 用来进行调试 显示当前app switcher里面的程序 截图键其实是组合键
             if info.flags == screenShotCombine {
                 print("Debug keyCode [ScreenShot]", info.keyCode)
@@ -189,7 +187,7 @@ let eventTap = CGEvent.tapCreate(
         }
 
         // banner layer
-        if doBanner() {
+        if info.doBanner() {
             // 禁止触发全局 command space
             if (info.keyCode == CGKeyCode(kVK_Space) && info.flags == [.maskCommand, .maskNonCoalesced, CGEventFlags(rawValue: 0x8)]) {
                 customEventFlow(_to: .cgAnnotatedSessionEventTap, vk: CGKeyCode(kVK_Space), flags: [.maskCommand, .maskNonCoalesced, CGEventFlags(rawValue: 0x8)])
@@ -208,7 +206,7 @@ let eventTap = CGEvent.tapCreate(
         }
         
         // symb enforcer layer
-        if doSymbEnforcer() {
+        if info.doSymbEnforcer() {
             // 符号覆盖逻辑
             if vk2ascii[info.keyCode] != nil {
                 var elementPointer: UnsafePointer<UniChar>? = nil
