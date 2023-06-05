@@ -8,14 +8,127 @@ import Carbon
 import Cocoa
 import Foundation
 
-let screenShotCombine: CGEventFlags = [.maskCommand, .maskShift, .maskNonCoalesced, CGEventFlags(rawValue: 0xA)]
+class FlagSet {
+    static let screenShotCombine: CGEventFlags = [
+        .maskCommand,
+        .maskShift,
+        .maskNonCoalesced,
+        CGEventFlags(rawValue: 0xA)
+    ]
+    static let OptionSPCharCombine: CGEventFlags = [
+        .maskAlternate,
+        .maskNonCoalesced,
+        CGEventFlags(rawValue: 0x20)
+    ]
+    static let OptionSPCharCombineStrip: CGEventFlags = [
+        .maskAlternate
+    ]
+    static let OptionSPCharShiftCombine: CGEventFlags = [
+        .maskAlternate,
+        .maskNonCoalesced,
+        .maskShift,
+        CGEventFlags(rawValue: 0x22)
+    ]
+    static let OptionSPCharShiftCombineStrip: CGEventFlags = [
+        .maskAlternate,
+        .maskNonCoalesced,
+        .maskShift,
+    ]
+    static let CommandSpace: CGEventFlags = [.maskCommand, .maskNonCoalesced, CGEventFlags(rawValue: 0x8)]
+    static let OptionSpace: CGEventFlags = [.maskAlternate, .maskNonCoalesced, CGEventFlags(rawValue: 0x20)]
+    static let CtrlSpace: CGEventFlags = [.maskControl, .maskNonCoalesced, CGEventFlags(rawValue: 0x1)]
+}
 
+// 用来放空的unicode 打不出字
+let null2ascii:[UniChar] = [0, 0]
+// 18 vk, 49 '1', 33 '!'
 let vk2ascii:[Int: [UniChar]] = [
-    18: [49, 33], 19: [50, 64], 20: [51, 35], 21: [52, 36], 23: [53, 37], 22: [54, 94], 26: [55, 38], 28: [56, 42], 25: [57, 40], 29: [48, 41], 50: [96, 126], 33: [91, 123], 30: [93, 125], 42: [92, 124], 41: [59, 58], 39: [39, 34], 27: [45, 95], 24: [61, 43], 43: [44, 60], 47: [46, 62], 44: [47, 63]
+    // 18-24 -- `1234567890-=
+    50: [96, 126],
+    18: [49, 33],
+    19: [50, 64],
+    20: [51, 35],
+    21: [52, 36],
+    23: [53, 37],
+    22: [54, 94],
+    26: [55, 38],
+    28: [56, 42],
+    25: [57, 40],
+    29: [48, 41],
+    27: [45, 95],
+    24: [61, 43],
+    // []\
+    33: [91, 123],
+    30: [93, 125],
+    42: [92, 124],
+    // ;',./
+    41: [59, 58],
+    39: [39, 34],
+    43: [44, 60],
+    47: [46, 62],
+    44: [47, 63],
 ]
+
+let vk2asciiFull:[Int: [UniChar]] = [
+    // 18-24 -- `1234567890-=
+    50: [96, 126],
+    18: [49, 33],
+    19: [50, 64],
+    20: [51, 35],
+    21: [52, 36],
+    23: [53, 37],
+    22: [54, 94],
+    26: [55, 38],
+    28: [56, 42],
+    25: [57, 40],
+    29: [48, 41],
+    27: [45, 95],
+    24: [61, 43],
+    // []\
+    33: [91, 123],
+    30: [93, 125],
+    42: [92, 124],
+    // ;',./
+    41: [59, 58],
+    39: [39, 34],
+    43: [44, 60],
+    47: [46, 62],
+    44: [47, 63],
+    // 正常的字符 qwertyuiopasfghjklzxcvbnm
+    12: [81, 113],
+    13: [87, 119],
+    14: [69, 101],
+    15: [82, 114],
+    17: [84, 116],
+    16: [89, 121],
+    32: [85, 117],
+    34: [73, 105],
+    31: [79, 111],
+    35: [80, 112],
+    0: [65, 97],
+    1: [83, 115],
+    2: [68, 100],
+    3: [70, 102],
+    5: [71, 103],
+    4: [72, 104],
+    38: [74, 106],
+    40: [75, 107],
+    37: [76, 108],
+    6: [90, 122],
+    7: [88, 120],
+    8: [67, 99],
+    9: [86, 118],
+    11: [66, 98],
+    45: [78, 110],
+    46: [77, 109]
+]
+
 
 let conn = _CGSDefaultConnection()
 
+func getPointer(array: [UniChar], offset: Int) -> UnsafePointer<UniChar> {
+    return array.withUnsafeBufferPointer { $0.baseAddress!.advanced(by: offset) }
+}
 
 func checkFlags(flags: CGEventFlags) -> String {
     var modifiers = [String]()
@@ -82,14 +195,6 @@ func getFrontmostProcessID() -> pid_t? {
     return nil
 }
 
-func customEventFlow(_to: CGEventTapLocation, vk: CGKeyCode, _from: CGEventSource? = nil, flags: CGEventFlags = CGEventFlags()) {
-    let keyDownEvent = CGEvent(keyboardEventSource: _from, virtualKey: vk, keyDown: true)!
-    let keyUpEvent = CGEvent(keyboardEventSource: _from, virtualKey: vk, keyDown: false)!
-    (keyDownEvent.flags, keyUpEvent.flags) = (flags, flags)
-    keyDownEvent.post(tap: _to)
-    keyUpEvent.post(tap: _to)
-}
-
 class EventInfo {
     let event: CGEvent
     let keyCode: Int        // Int 类型兼容性较好
@@ -99,6 +204,7 @@ class EventInfo {
     let anyOtherModifiers: CGEventFlags
     let frontAppName: String
     let nowIsFullScreen: Bool
+    let send: Bool          // 保留字段
 
     init(event: CGEvent) {
         self.event = event
@@ -109,6 +215,7 @@ class EventInfo {
         self.anyOtherModifiers = self.flags.intersection([.maskControl, .maskCommand, .maskAlternate, .maskSecondaryFn, .maskAlphaShift, .maskHelp])
         self.frontAppName = (workspace.frontmostApplication?.localizedName!)!
         self.nowIsFullScreen = checkFullScreen()     // better performance
+        self.send = false
     }
     
     func log() {
@@ -142,6 +249,47 @@ class EventInfo {
     func doHook() -> Bool {
         return true
     }
+    
+    func doSpChIgnore() -> Bool {
+        // 忽略option+字母键 带来的特殊字符
+        return true
+    }
+    
+    func flow(
+        _to: CGEventTapLocation = .cgSessionEventTap,
+        vk: CGKeyCode? = nil, // vk of 'q'
+        _from: CGEventSource? = nil,
+        flags: CGEventFlags? = nil,
+        unicode: UnsafePointer<UniChar>? = nil
+    ) {
+        // 定义一个函数，用于获取默认值
+        func defaultValue<T>(for parameter: T?, fallback: () -> T) -> T {
+            return parameter ?? fallback()
+        }
+        
+        // 使用新的默认参数语法来获取默认值
+        let vk_inuse = defaultValue(for: vk, fallback: { CGKeyCode(self.keyCode) })
+        let flags_inuse = defaultValue(for: flags, fallback: { self.flags })
+        
+        
+        let keyDownEvent = CGEvent(keyboardEventSource: _from, virtualKey: vk_inuse, keyDown: true)!
+        let keyUpEvent = CGEvent(keyboardEventSource: _from, virtualKey: vk_inuse, keyDown: false)!
+        // 保持flags
+        (keyDownEvent.flags, keyUpEvent.flags) = (flags_inuse, flags_inuse)
+        // 更改unicode
+        if unicode != nil {
+            keyDownEvent.keyboardSetUnicodeString(stringLength: 1, unicodeString: unicode)
+            keyUpEvent.keyboardSetUnicodeString(stringLength: 1, unicodeString: unicode)
+        }
+        // 发送event
+        keyDownEvent.post(tap: _to)
+        keyUpEvent.post(tap: _to)
+    }
+    
+    func pass() -> Unmanaged<CGEvent> {
+        return Unmanaged.passRetained(event)
+    }
+
 }
 
 // 创建一个键盘事件监听器
@@ -172,7 +320,7 @@ let eventTap = CGEvent.tapCreate(
         // functional layer  截图键 和command shift z冲突
         if info.doFunctional() {
             // 把鸡肋的截图键 用来进行调试 显示当前app switcher里面的程序 截图键其实是组合键
-            if info.flags == screenShotCombine {
+            if info.flags == FlagSet.screenShotCombine && info.keyCode == 21 {
                 print("Debug keyCode [ScreenShot]", info.keyCode)
                 print("\t", targetApplications)                         // target applications
                 // applications name in Application Switcher
@@ -186,21 +334,16 @@ let eventTap = CGEvent.tapCreate(
             
         }
 
-        // banner layer
+        // banner layer  把快捷键直接发送给应用程序
         if info.doBanner() {
             // 禁止触发全局 command space
-            if (info.keyCode == CGKeyCode(kVK_Space) && info.flags == [.maskCommand, .maskNonCoalesced, CGEventFlags(rawValue: 0x8)]) {
-                customEventFlow(_to: .cgAnnotatedSessionEventTap, vk: CGKeyCode(kVK_Space), flags: [.maskCommand, .maskNonCoalesced, CGEventFlags(rawValue: 0x8)])
-                return nil
-            }
             // 禁止触发全局 option space
-            if (info.keyCode == CGKeyCode(kVK_Space) && info.flags == [.maskAlternate, .maskNonCoalesced, CGEventFlags(rawValue: 0x20)]) {
-                customEventFlow(_to: .cgAnnotatedSessionEventTap, vk: CGKeyCode(kVK_Space), flags: [.maskAlternate, .maskNonCoalesced, CGEventFlags(rawValue: 0x20)])
-                return nil
-            }
             // 禁止触发切换输入法
-            if (info.keyCode == CGKeyCode(kVK_Space) && info.flags == [.maskControl, .maskNonCoalesced, CGEventFlags(rawValue: 0x1)]) {
-                customEventFlow(_to: .cgAnnotatedSessionEventTap, vk: CGKeyCode(kVK_Space), flags: [.maskControl, .maskNonCoalesced, CGEventFlags(rawValue: 0x1)])
+            if (
+                info.keyCode == CGKeyCode(kVK_Space) &&
+                [FlagSet.CommandSpace, FlagSet.CtrlSpace, FlagSet.OptionSpace].contains(info.flags)
+            ) {
+                info.flow(_to: .cgAnnotatedSessionEventTap, vk: CGKeyCode(kVK_Space))
                 return nil
             }
         }
@@ -211,37 +354,44 @@ let eventTap = CGEvent.tapCreate(
             if vk2ascii[info.keyCode] != nil {
                 var elementPointer: UnsafePointer<UniChar>? = nil
 
-                // 不要影响其他修饰键
+                // 不要影响其他修饰键 也就是带有修饰键的时候 不管
                 if info.anyOtherModifiers.rawValue != 0 {
-                    return Unmanaged.passRetained(event)
+                    return info.pass()
                 }
                 
                 if info.shiftCase {
                     // 拿到目标字符指针
-                    elementPointer = vk2ascii[info.keyCode]!.withUnsafeBufferPointer { $0.baseAddress!.advanced(by: 1) }
+//                    elementPointer = vk2ascii[info.keyCode]!.withUnsafeBufferPointer { $0.baseAddress!.advanced(by: 1) }
+                    elementPointer = getPointer(array: vk2ascii[info.keyCode]!, offset: 1)
                 } else if info.plainCase {
                     if (info.keyCode >= 18 && info.keyCode <= 29) { // 数字如果处理的话会影响输入法
                         return Unmanaged.passRetained(event)
                     }
-                    elementPointer = vk2ascii[info.keyCode]!.withUnsafeBufferPointer { $0.baseAddress!.advanced(by: 0) }
+//                    elementPointer = vk2ascii[info.keyCode]!.withUnsafeBufferPointer { $0.baseAddress!.advanced(by: 0) }
+                    elementPointer = getPointer(array: vk2ascii[info.keyCode]!, offset: 0)
                 }
-                // 发送目标字符
-                // 这里12是q的keycode. 这个virtualKey没有什么用,但是keycode要存在,这里我们用一个字母代替.
-                //        let source = CGEventSource(stateID: .hidSystemState) // source 可以省略
-                let keyDown = CGEvent(keyboardEventSource: nil ,virtualKey: 12, keyDown: true)
-                let keyUp = CGEvent(keyboardEventSource: nil, virtualKey: 12, keyDown: false)
-//                print(Character(UnicodeScalar(elementPointer?.pointee ?? 0)!))
-                keyDown?.keyboardSetUnicodeString(stringLength: 1, unicodeString: elementPointer)
-                keyUp?.keyboardSetUnicodeString(stringLength: 1, unicodeString: elementPointer)
-                keyDown?.post(tap: .cghidEventTap)
-                keyUp?.post(tap: .cghidEventTap)
+                // 发送目标字符  这里12是q的keycode. 这个virtualKey没有什么用,但是keycode要存在,这里我们用一个字母代替.  不指定vk为12的话 会进入无限循环
+                info.flow(_to: .cghidEventTap, vk: 12, unicode: elementPointer)
                 return nil
-            } else {
-                return Unmanaged.passRetained(event)
             }
         }
 
-        return Unmanaged.passRetained(event)
+        if info.doSpChIgnore() {
+            if (info.flags == FlagSet.OptionSPCharCombine) || (info.flags == FlagSet.OptionSPCharShiftCombine) {
+                if vk2asciiFull[info.keyCode] != nil {
+                    if info.flags == FlagSet.OptionSPCharCombine{
+                        // 使用null2ascii 让键盘输出不了特殊字符
+                        info.flow(flags: FlagSet.OptionSPCharCombineStrip, unicode: getPointer(array: null2ascii, offset: 0))
+                    }
+                    else {
+                        // 目前没有对option shift xxx进行hook, 下面的代码基本无效
+                        info.flow(flags: FlagSet.OptionSPCharShiftCombineStrip)
+                    }
+                    return nil
+                }
+            }
+        }
+        return info.pass()
     },
     userInfo: nil
 )
