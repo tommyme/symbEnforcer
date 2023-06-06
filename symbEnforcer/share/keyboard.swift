@@ -213,6 +213,8 @@ class EventInfo {
     let nowIsFullScreen: Bool
     let send: Bool          // 保留字段
     var keyUnicode: UniChar = 0 // 存放当前event的unicode
+    private let workspace = NSWorkspace.shared
+
 
     init(event: CGEvent) {
         self.event = event
@@ -225,6 +227,16 @@ class EventInfo {
         self.nowIsFullScreen = checkFullScreen()     // better performance
         self.send = false
         self.keyUnicode = getUnicode()
+        workspace.notificationCenter.addObserver(
+            self,
+            selector: #selector(doHook),
+            name: NSWorkspace.activeSpaceDidChangeNotification,
+            object: workspace)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(doHook),
+            name: NSNotification.Name("ButtonPressed"),
+            object: nil)
     }
     func getUnicode() -> UniChar {
         let maxStringLength = 4
@@ -258,7 +270,7 @@ class EventInfo {
         return true
     }
 
-    func doHook() -> Bool {
+    @objc func doHook() -> Bool {
         return true
     }
     
