@@ -166,7 +166,7 @@ func checkFlags(flags: CGEventFlags) -> String {
     
     let allFlags: CGEventFlags = [.maskNonCoalesced, .maskNumericPad, .maskSecondaryFn, .maskHelp, .maskAlphaShift, .maskCommand, .maskAlternate, .maskControl, .maskShift ]
     
-    // 交集 取反 再交  遇到类似于 截图键的情况的时候就能够捕捉到特殊cgeventFlag
+    // 交集 取反 再交  能够捕捉到 特殊的 以raw值为代表的 cgeventFlag
     let res = CGEventFlags(rawValue: ~flags.intersection(allFlags).rawValue).intersection(flags)
     
     if res.rawValue > 0 {
@@ -195,6 +195,13 @@ func getFrontmostProcessID() -> pid_t? {
     return nil
 }
 
+struct KeyUnicode {
+    var actualStringLength: Int
+    var unicodeString: [UniChar]
+}
+
+//var currentKeyUnicode = KeyUnicode(actualStringLength: 1, unicodeString: [UniChar](repeating: 0, count: 4))
+
 class EventInfo {
     let event: CGEvent
     let keyCode: Int        // Int 类型兼容性较好
@@ -205,6 +212,7 @@ class EventInfo {
     let frontAppName: String
     let nowIsFullScreen: Bool
     let send: Bool          // 保留字段
+    var keyUnicode: UniChar = 0 // 存放当前event的unicode
 
     init(event: CGEvent) {
         self.event = event
@@ -216,18 +224,22 @@ class EventInfo {
         self.frontAppName = (workspace.frontmostApplication?.localizedName!)!
         self.nowIsFullScreen = checkFullScreen()     // better performance
         self.send = false
+        self.keyUnicode = getUnicode()
     }
-    
+    func getUnicode() -> UniChar {
+        let maxStringLength = 4
+        var actualStringLength = 0
+        var unicodeString = [UniChar](repeating: 0, count: Int(maxStringLength))
+        self.event.keyboardGetUnicodeString(maxStringLength: 1, actualStringLength: &actualStringLength, unicodeString: &unicodeString)
+        return unicodeString[0]
+    }
     func log() {
         // show log
-        var actualStringLength = 0
-        var unicodeString:[UniChar] = [0, 0]
-        event.keyboardGetUnicodeString(maxStringLength: 2, actualStringLength: &actualStringLength, unicodeString: &unicodeString)
         let timestamp = formatter.string(from: Date())
         
         // logging
         print("\(timestamp)", "keycode", keyCode)
-        print("\tunicode: \(unicodeString)", "shift: \(shiftCase)", "plain: \(plainCase)\n",
+        print("\tunicode: \(self.keyUnicode)", "shift: \(shiftCase)", "plain: \(plainCase)\n",
               "\tfront-appname: <\(frontAppName)>\n",
               "\tfull-screen: \(prevIsFullScreen)\n",
               "\t\(checkFlags(flags: flags))")
@@ -339,8 +351,8 @@ let eventTap = CGEvent.tapCreate(
             // 禁止触发全局 command space
             // 禁止触发全局 option space
             // 禁止触发切换输入法
-            if (
-                info.keyCode == CGKeyCode(kVK_Space) &&
+            if (info.keyCode == CGKeyCode(kVK_Space) &&
+                // 对三种情况一起进行处理
                 [FlagSet.CommandSpace, FlagSet.CtrlSpace, FlagSet.OptionSpace].contains(info.flags)
             ) {
                 info.flow(_to: .cgAnnotatedSessionEventTap, vk: CGKeyCode(kVK_Space))
@@ -351,26 +363,25 @@ let eventTap = CGEvent.tapCreate(
         // symb enforcer layer
         if info.doSymbEnforcer() {
             // 符号覆盖逻辑
-            if vk2ascii[info.keyCode] != nil {
+            var target: [UniChar]? = vk2ascii[info.keyCode]
+
+            if target != nil {
                 var elementPointer: UnsafePointer<UniChar>? = nil
 
-                // 不要影响其他修饰键 也就是带有修饰键的时候 不管
-                if info.anyOtherModifiers.rawValue != 0 {
-                    return info.pass()
-                }
+                if ((info.anyOtherModifiers.rawValue != 0) ||                       // 不要影响其他修饰键
+                    (info.plainCase && info.keyCode >= 18 && info.keyCode <= 29)    // 如果 没有 shift 并且是 数字
+                ) { return info.pass() }
+                                
+                let offset: Int = info.shiftCase ? 1 : 0
+                elementPointer = getPointer(array: target!, offset: offset)
                 
-                if info.shiftCase {
-                    // 拿到目标字符指针
-//                    elementPointer = vk2ascii[info.keyCode]!.withUnsafeBufferPointer { $0.baseAddress!.advanced(by: 1) }
-                    elementPointer = getPointer(array: vk2ascii[info.keyCode]!, offset: 1)
-                } else if info.plainCase {
-                    if (info.keyCode >= 18 && info.keyCode <= 29) { // 数字如果处理的话会影响输入法
-                        return Unmanaged.passRetained(event)
-                    }
-//                    elementPointer = vk2ascii[info.keyCode]!.withUnsafeBufferPointer { $0.baseAddress!.advanced(by: 0) }
-                    elementPointer = getPointer(array: vk2ascii[info.keyCode]!, offset: 0)
-                }
-                // 发送目标字符  这里12是q的keycode. 这个virtualKey没有什么用,但是keycode要存在,这里我们用一个字母代替.  不指定vk为12的话 会进入无限循环
+                // 发送目标字符  这里12是q的keycode. 这个virtualKey没有什么用,但是keycode要存在,这里我们用一个字母代替.
+                // 不指定vk为12的话 会进入无限循环
+                // 进入无限循环是因为 如果保持原有vk 还是会进入symbEnforcer逻辑
+                
+//                if info.keyUnicode == target![offset] { // 已经处理过了
+//                    return nil
+//                }
                 info.flow(_to: .cghidEventTap, vk: 12, unicode: elementPointer)
                 return nil
             }
