@@ -9,6 +9,12 @@
 ```
 配置文件可以热加载, 我没有特意处理文件语法错误, 尽量不要整语法错误.
 
+## build
+- 可以使用xcodebuild进行build 会生成到 `build/Release/symbEnforcer`
+- 可以使用xcode软件 command b进行build 会生成到 `~/Library/Developer/Xcode/DerivedData/${SYMB_ENFORCER_DIR}/Build/Products/Debug/symbEnforcer`
+- `xcodebuild -project MyApp.xcodeproj -scheme Release`
+- `xcodebuild -scheme symbEnforcer -configuration Debug`
+- 想使用swift进行build
 ## 调试
 向list里面添加程序名达到在指定的程序中进行强制英文标点。
 
